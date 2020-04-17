@@ -1,1 +1,0 @@
-GNLib.RequireFolder( "guthcars" )
