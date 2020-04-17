@@ -5,7 +5,7 @@ function GNCars.AddVehicle( vehicle_class, seats, nodraw )
 
     GNCars.Vehicles[vehicle_class] = { seats = seats, nodraw = nodraw == nil and true or nodraw }
 end
-GNCars.AddVehicle( "ast_db5tdm", { Vector( -15, -6, 15 ), Vector( -11, -38, 15 ), Vector( 11, -38, 15 ) } )
+--GNCars.AddVehicle( "ast_db5tdm", { Vector( -15, -6, 15 ), Vector( -11, -38, 15 ), Vector( 11, -38, 15 ) } )
 
 --  > add passenger seats
 hook.Add( "OnEntityCreated", "gncars", function( ent )
@@ -28,7 +28,7 @@ hook.Add( "OnEntityCreated", "gncars", function( ent )
 end )
 
 --  > choose passenger seat
-hook.Add( "gncars:AttemptEnterVehicle", "gncars", function( ply, veh, trace )
+local function choose_vehicle_seat( ply, veh, trace )
     local seats = { veh:GetPassengerSeatPoint( 1 ) }
     table.Add( seats, veh.Seats )
 
@@ -57,7 +57,7 @@ hook.Add( "gncars:AttemptEnterVehicle", "gncars", function( ply, veh, trace )
             ply:EnterVehicle( seat )
         end
     end )
-end )
+end
 
 --  > override default one (else it exits you from the vehicle)
 hook.Add( "CanPlayerEnterVehicle", "gncars", function( ply, veh ) 
@@ -77,6 +77,6 @@ hook.Add( "KeyPress", "gncars", function( ply, key )
         if not IsValid( target ) or not target:IsVehicle() then return end
         if target:GetPos():Distance( ply:GetPos() ) > 128 then return end
 
-        hook.Run( "gncars:AttemptEnterVehicle", ply, target, trace )
+        choose_vehicle_seat( ply, target, trace )
     end
 end )
