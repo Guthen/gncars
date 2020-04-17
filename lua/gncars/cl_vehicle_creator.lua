@@ -4,18 +4,26 @@ local lamp_model = "models/maxofs2d/lamp_flashlight.mdl"
 local elements = {
     "Actions",
     {
+        type = "Toggle",
+        text = "Wireframe",
+        action = function( form, toggle )
+            form.wireframe = toggle
+        end,
+    },
+    {
         type = "Button",
         text = "Export JSON",
         action = function( form )
             local vehicle = {}
 
-            vehicle.seats = {}
             for i, v in ipairs( form.entities ) do
+                local name = v.PartType .. "s"
+                if not vehicle[name] then vehicle[name] = {} end
+
                 local obj = {}
                 table.Add( obj, { v:GetPos():Unpack() } )
                 table.Add( obj, { v:GetAngles():Unpack() } )
 
-                local name = v.PartType .. "s"
                 vehicle[name][#vehicle[name] + 1] = obj
             end
 
@@ -108,7 +116,9 @@ add_ent_elements( "seat", jeep_seat_model, true )
 add_ent_elements( "lamp", lamp_model, true )
 
 function GNCars.OpenCreatorMenu()
-    local form = { elements = {}, entities = {} }
+    if not LocalPlayer():IsSuperAdmin() then return end
+
+    local form = { elements = {}, entities = {}, wireframe = false }
 
     --  > frame
     local frame = GNLib.CreateFrame( "GNCars - Creator Menu", ScrW() * .4, ScrH() * .5 )
@@ -138,7 +148,11 @@ function GNCars.OpenCreatorMenu()
         modelpanel:SetFirstPerson( true )
         modelpanel:SetCamPos( modelpanel:GetCamPos() + Vector( 100, 100, 25 ) )
         modelpanel.LayoutEntity = function( self, ent )
-            ent:SetMaterial( "models/wireframe" )
+            if form.wireframe then 
+                ent:SetMaterial( "models/wireframe" )
+            else
+                ent:SetMaterial( "" )
+            end
         end
         modelpanel.PreDrawModel = function( self, ent )
             for i, v in ipairs( form.entities ) do
@@ -192,6 +206,14 @@ function GNCars.OpenCreatorMenu()
                     end
 
                 element = combobox
+            elseif v.type == "Toggle" then
+                local toggle = optionlist:Add( "GNToggleButton" )      
+                    toggle:Dock( TOP )
+                    toggle:DockMargin( 15, 2, 20, 0 )
+                    toggle.OnToggled = function( self, toggle )
+                        v.action( form, toggle )
+                    end
+                    
             elseif v.type == "Vector" then
                 element = {}
 
