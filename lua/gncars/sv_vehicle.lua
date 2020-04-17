@@ -24,6 +24,12 @@ function GNCars.AddVehicle( vehicle_class, seats, nodraw )
 end
 --[[ GNCars.AddVehicle( "m1tdm", { Vector( 18, -0, 8 ) } ) ]]
 
+function GNCars.EnterVehicle( ply, veh )
+    veh.ForceEnter = true
+    ply:EnterVehicle( veh )
+    veh.ForceEnter = nil
+end
+
 --  > add passenger seats
 hook.Add( "OnEntityCreated", "gncars", function( ent )
     if not ent:IsVehicle() then return end
@@ -66,9 +72,7 @@ local function choose_vehicle_seat( ply, veh, trace )
     --  > attempt to enter seat
     timer.Simple( .1, function()
         if isvector( seat ) then
-            veh.ForceEnter = true
-            ply:EnterVehicle( veh )
-            veh.ForceEnter = nil
+            GNCars.EnterVehicle( ply, veh )
             return
         else
             ply:EnterVehicle( seat )
