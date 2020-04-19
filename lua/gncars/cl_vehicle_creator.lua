@@ -1,8 +1,41 @@
 local jeep_seat_model = "models/nova/jeep_seat.mdl"
 local lamp_model = "models/maxofs2d/lamp_flashlight.mdl"
 
+local function notify( ... )
+    chat.AddText( GNLib.Colors.Alizarin, "GNCars: ", GNLib.Colors.Clouds, ... )
+end
+
+local function get_tbl( form )
+    local vehicle = {}
+
+    --  > create config
+    for i, v in ipairs( form.entities ) do
+        local name = v.PartType .. "s"
+        if not vehicle[name] then vehicle[name] = {} end
+
+        local obj = {
+            pos = { v:GetPos():Unpack() },
+            ang = { v:GetAngles():Unpack() },
+            is_back_light = v.IsBackLight,
+        }
+
+        vehicle[name][#vehicle[name] + 1] = obj
+    end
+    if table.Count( vehicle ) <= 0 then return notify( "Please finish the config before trying to export it." ) end
+
+    return { [form.vehicle:GetVehicleClass()] = vehicle }
+end
+
+local function get_json( form, prettify, should_print )
+    --  > json
+    local json = util.TableToJSON( get_tbl( form ), prettify == nil and true or prettify )
+    if should_print then print( json ) end
+
+    return json
+end
+
 local elements = {
-    "Actions",
+    "Options",
     {
         type = "Toggle",
         text = "Wireframe",
@@ -10,34 +43,77 @@ local elements = {
             form.wireframe = toggle
         end,
     },
+    "Actions",
     {
         type = "Button",
         text = "Export JSON",
+        color = GNLib.Colors.PeterRiver,
+        action = get_json,
+    },
+    {
+        type = "Button",
+        text = "Save Vehicle",
+        color = GNLib.Colors.PeterRiver,
         action = function( form )
-            local vehicle = {}
+            if not LocalPlayer():IsSuperAdmin() then notify( "You must be an admin to save custom vehicles on the server." ) end
 
-            for i, v in ipairs( form.entities ) do
-                local name = v.PartType .. "s"
-                if not vehicle[name] then vehicle[name] = {} end
+            local tbl = get_tbl( form, false )
+            if not tbl then return end
 
-                local obj = {}
-                table.Add( obj, { v:GetPos():Unpack() } )
-                table.Add( obj, { v:GetAngles():Unpack() } )
+            GNLib.DermaMessage( "GNCars - Save", "This option save the vehicle in your data folder and overwrite the global vehicle configuration (if exists). Are you sure to save this vehicle?", "Yes", function( affirmative )
+                if not affirmative then return end
 
-                vehicle[name][#vehicle[name] + 1] = obj
-            end
+                net.Start( "GNCars:Data" )
+                    net.WriteTable( tbl )
+                net.SendToServer()
+            end, "No" )
+        end,
+    },
+    {
+        type = "Button",
+        text = "Suggest Vehicle",
+        color = GNLib.Colors.Amethyst,
+        action = function( form, modelpanel )
+            local json = get_json( form, false )
+            if not json then return end
 
-            print( util.TableToJSON( { [form.vehicle:GetVehicleClass()] = vehicle }, true ) )
+            GNLib.DermaMessage( "GNCars - Suggestion", "We are going to take a screenshot of your vehicle configuration, please be sure that you have a good view of the vehicle and its elements (seats, lamps, etc.). Are you sure about that?", "Yes", function( affirmative )
+                if not affirmative then return end
+
+                local x, y, w, h = GNLib.GetPanelAbsoluteBounds( modelpanel )
+                local wireframe = form.wireframe
+                form.wireframe = true
+
+                hook.Add( "PostRender", "GNCars:Screenshot", function() 
+                    local data = render.Capture( {
+                        format = "jpeg",
+                        quality = 70,
+                        x = x,
+                        y = y,
+                        w = w,
+                        h = h,
+                    } )
+
+                    http.Post( "http://gnlib.wizzarheberg.fr/gncars/vehicles/add.php", { json = json, img = util.Base64Encode( data ), owner = LocalPlayer():SteamID() }, function( body, len, headers, code )
+                        notify( ( "Response (HTTP/%d): %s" ):format( code, body ) )
+                    end )
+
+                    form.wireframe = wireframe
+                    hook.Remove( "PostRender", "GNCars:Screenshot" )
+                end )
+            end, "No" )
         end
     },
 } 
 
-local function add_ent_elements( name, model, angles )
+local function add_ent_elements( name, model, angles, new_elements )
     local els = {
+        "-",
         name:sub( 1, 1 ):upper() .. name:sub( 2, #name ) .. "s",
         {
             type = "Button",
             text = "Add " .. name,
+            color = GNLib.Colors.PeterRiver,
             action = function( form, modelpanel )
                 local ent = ClientsideModel( model )
                     ent:SetNoDraw( true )
@@ -46,25 +122,31 @@ local function add_ent_elements( name, model, angles )
 
                 --  > combobox
                 local combobox = form.elements[name .. "_combo_box"]
+
+                --  > set pos to the selected choice
+                local last_ent = combobox:GetSelected() and combobox:GetSelected().data
+                if IsValid( last_ent ) then
+                    ent:SetPos( last_ent:GetPos() )
+                    ent:SetAngles( last_ent:GetAngles() )
+                end
+
+                --  > combobox choice
                 combobox:AddChoice( name:sub( 1, 1 ):upper() .. name:sub( 2, #name ) .. " #" .. #combobox.choices + 1, ent, true )
                 combobox:CloseMenu()
 
                 local choice = combobox.choices[#combobox.choices]
                 combobox:OnSelect( #combobox.choices, choice.value, choice.data )
 
-                --  > set pos to the selected choice
-                local last_ent = combobox:GetSelected() and combobox:GetSelected().data
-                if IsValid( last_ent ) then
-                    ent:SetPos( last_ent:GetPos() )
-                end
-
+                --  > add to entities
                 form.entities[#form.entities + 1] = ent
             end
         },
         {
             type = "Button",
             text = "Remove " .. name,
+            color = GNLib.Colors.Alizarin,
             action = function( form, modelpanel )
+                if not form[name] then return end
                 form[name]:Remove()
 
                 --  > combobox
@@ -80,12 +162,28 @@ local function add_ent_elements( name, model, angles )
             action = function( form, value, data )
                 form[name] = data
 
+                --  > position
                 local sliders = form.elements[name .. "_vector"]
                 local pos = form[name]:GetPos()
 
                 sliders.x:SetValue( pos.x )
                 sliders.y:SetValue( pos.y )
                 sliders.z:SetValue( pos.z )
+
+                --  > angle
+                if angles then
+                    local sliders = form.elements[name .. "_angle"]
+                    local ang = form[name]:GetAngles()
+
+                    sliders.p:SetValue( ang.p )
+                    sliders.y:SetValue( ang.y )
+                    sliders.r:SetValue( ang.r )
+                end
+
+                --  > custom
+                if name == "lamp" then
+                    form.elements.toggle_back_light:SetToggled( form[name].IsBackLight )
+                end
             end,
         },
         {
@@ -111,13 +209,24 @@ local function add_ent_elements( name, model, angles )
     }
 
     table.Add( elements, els )
+    if new_elements then table.Add( elements, new_elements( name ) ) end
 end
 add_ent_elements( "seat", jeep_seat_model, true )
-add_ent_elements( "lamp", lamp_model, true )
+add_ent_elements( "lamp", lamp_model, true, function( name ) return {
+        {
+            type = "Toggle",
+            id = "toggle_back_light",
+            text = "Back light",
+            action = function( form, toggle )
+                if not form[name] then return end
+
+                form[name].IsBackLight = toggle
+            end,
+        } 
+    }
+end )
 
 function GNCars.OpenCreatorMenu()
-    if not LocalPlayer():IsSuperAdmin() then return end
-
     local form = { elements = {}, entities = {}, wireframe = false }
 
     --  > frame
@@ -133,7 +242,7 @@ function GNCars.OpenCreatorMenu()
     if not IsValid( vehicle ) then 
         frame:Remove()
 
-        chat.AddText( GNLib.Colors.Alizarin, "GNCars: ", GNLib.Colors.Clouds, "Please go in a vehicle before opening this panel." )
+        notify( "Please go in a vehicle before opening this panel." )
         return 
     end
     form.vehicle = vehicle
@@ -170,9 +279,9 @@ function GNCars.OpenCreatorMenu()
         optionlist:GetVBar():SetWide( 0 )
 
     local function add_label( text, parent )
-        local label = optionlist:Add( "DLabel" )
+        local label = ( parent or optionlist ):Add( "DLabel" )
             label:Dock( TOP )
-            label:DockMargin( 10, 10, 0, 0 )
+            label:DockMargin( 10, 5, 0, 0 )
             label:SetText( text )
             label:SetFont( "GNLFontB15" )
             label:SetColor( GNLib.Colors.Clouds )
@@ -181,9 +290,29 @@ function GNCars.OpenCreatorMenu()
         return label
     end
 
+    --  > get bounds for pos sliders
+    local max_slider_value = 100
+    do 
+        local min_bounds, max_bounds = vehicle:GetModelBounds()
+        for i, v in ipairs( { unpack( { min_bounds:Unpack() } ), unpack( { max_bounds:Unpack() } ) } ) do
+            if max_slider_value < math.abs( v ) then max_slider_value = math.abs( v ) end
+        end
+    end
+
+    --  > show elements
     for i, v in ipairs( elements ) do
-        if isstring( v ) then 
-            add_label( v ) 
+        if isstring( v ) then
+            if v == "-" then
+                local separator = optionlist:Add( "DPanel" )
+                    separator:Dock( TOP )
+                    separator:DockMargin( 5, 12, 15, 2 )
+                    separator:SetTall( 1 )
+                    separator.Paint = function( self, w, h )
+                        draw.RoundedBox( 0, 0, 0, w, h, frame.header.color )
+                    end
+            else
+                add_label( v ) 
+            end
         else
             local element
             if v.type == "Button" then
@@ -191,8 +320,15 @@ function GNCars.OpenCreatorMenu()
                     button:Dock( TOP )
                     button:DockMargin( 15, 2, 20, 0 )
                     button:SetText( v.text )
+                    button:SetTextColor( GNLib.Colors.Clouds )
+                    button:SetHoveredTextColor( GNLib.Colors.Silver )
                     button.DoClick = function()
                         if v.action then v.action( form, modelpanel, optionlist ) end
+                    end
+
+                    if v.color then 
+                        button:SetColor( v.color ) 
+                        button:SetHoveredColor( ColorAlpha( v.color, 160 ) )
                     end
 
                 element = button
@@ -207,18 +343,28 @@ function GNCars.OpenCreatorMenu()
 
                 element = combobox
             elseif v.type == "Toggle" then
-                local toggle = optionlist:Add( "GNToggleButton" )      
-                    toggle:Dock( TOP )
-                    toggle:DockMargin( 15, 2, 20, 0 )
+                local container = optionlist:Add( "DPanel" )
+                    container:Dock( TOP )
+                    container:DockMargin( 15, 2, 20, 2 )
+                    container.Paint = function() end
+
+                local label = add_label( v.text, container )
+                    label:Dock( LEFT )
+                    label:DockMargin( 0, 0, 0, 0 )
+                    label:SetFont( "GNLFont12" )
+
+                local toggle = container:Add( "GNToggleButton" )      
+                    toggle:Dock( LEFT )
                     toggle.OnToggled = function( self, toggle )
                         v.action( form, toggle )
                     end
                     
+                element = toggle
             elseif v.type == "Vector" then
                 element = {}
 
                 if v.text then
-                    add_label( v.text )
+                    add_label( v.text ):SetFont( "GNLFontB13" )
                 end
 
                 local vector = Vector()
@@ -229,7 +375,7 @@ function GNCars.OpenCreatorMenu()
                         numslider:Dock( TOP )
                         numslider:DockMargin( 15, 0, 5, 0 )
                         --numslider:SetWide( optionlist:GetWide() )
-                        numslider:SetMinMax( -100, 100 )
+                        numslider:SetMinMax( -max_slider_value, max_slider_value )
                         numslider:SetValue( 0 )
                         numslider:SetText( axis )
                         numslider.OnValueChanged = function( self, value )
@@ -243,7 +389,7 @@ function GNCars.OpenCreatorMenu()
                 element = {}
 
                 if v.text then
-                    add_label( v.text )
+                    add_label( v.text ):SetFont( "GNLFontB13" )
                 end
 
                 local angle = Angle()
@@ -275,18 +421,27 @@ function GNCars.OpenCreatorMenu()
     --  > load
     local config = GNCars.Vehicles[vehicle:GetVehicleClass()]
     if config then
-        local seats = {}
+        for k, conf in pairs( config ) do
+            if not istable( conf ) then continue end
 
-        for i, v in ipairs( config.seats ) do
-            local ent = ClientsideModel( jeep_seat_model )
-                ent:SetNoDraw( true )
-                ent:SetPos( v )
+            local vehicles_ents = {}
 
-            form.elements.seat_combo_box:AddChoice( "Seat #" .. i, ent )
-            seats[i] = ent
+            for i, v in ipairs( conf ) do
+                local part = k:sub( 1, #k - 1 )
+
+                local ent = ClientsideModel( part == "lamp" and lamp_model or jeep_seat_model )
+                    ent:SetNoDraw( true )
+                    ent:SetPos( v.pos )
+                    ent:SetAngles( v.ang )
+                    ent.PartType = part
+                    ent.IsBackLight = v.is_back_light
+    
+                form.elements[ent.PartType .. "_combo_box"]:AddChoice( k:sub( 1, 1 ):upper() .. k:sub( 2 ) .. " #" .. i, ent )
+                vehicles_ents[i] = ent
+            end
+    
+            table.Add( form.entities, vehicles_ents ) 
         end
-
-        table.Add( form.entities, seats ) 
     end
 end
 concommand.Add( "gncars_creatormenu", GNCars.OpenCreatorMenu )

@@ -43,11 +43,24 @@ local function get_car( ply )
     return car
 end
 
+local function switch_lights( car, ply, switch, back_light )
+    back_light = back_light or false
+
+    if IsValid( car ) and car:GetDriver() == ply then
+        for k, v in ipairs( car.Lights ) do
+            if ( back_light and not v.IsBackLight ) or ( not back_light and v.IsBackLight ) then continue end
+            v:Switch( switch == nil and not v:GetOn() or switch )
+            v:UpdateLight()
+        end
+    end
+end
+
 util.AddNetworkString( "GNCars:BindTransmit" )
 net.Receive( "GNCars:BindTransmit", function( _, ply )
     local bind = net.ReadString()
 
     if bind == "+use" then
+        --  > enter a vehicle seat
         if ply:InVehicle() then return end
 
         local trace = ply:GetEyeTrace()
@@ -58,6 +71,7 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
 
         choose_vehicle_seat( ply, target, trace )
     elseif bind:StartWith( "slot" ) then
+        --  > change siege role
         local id = tonumber( bind:Replace( "slot", "" ) )
         id = id == 0 and 10 or id
 
@@ -74,19 +88,28 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
 
         end
     elseif bind == "+reload" then
+        --  > coink coink
         local car = get_car( ply )
 
         if IsValid( car ) and car:GetDriver() == ply then
             car:EmitSound( "ambient/alarms/klaxon1.wav" )
         end
     elseif bind == "impulse 100" then
+        --  > front lights
         local car = get_car( ply )
         
-        if IsValid( car ) and car:GetDriver() == ply then
-            for k, v in ipairs( car.Lights ) do
-                v:Switch( not v:GetOn() )
-                v:UpdateLight()
-            end
-        end
+        switch_lights( car, ply, nil, false )
+    elseif bind == "+back" or bind == "+jump" then
+        --  > switch on back lights
+        local car = get_car( ply )
+        
+        switch_lights( car, ply, true, true )
+    else
+        --  > switch off back lights
+        local car = get_car( ply )
+
+        timer.Simple( .5, function()
+            switch_lights( car, ply, false, true )
+        end )
     end
 end )

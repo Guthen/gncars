@@ -31,7 +31,7 @@ local function spawn_light( ent, pos, ang )
 
         light:SetFlashlightTexture( "effects/flashlight/hard" )
         light:SetColor( color_white )
-        light:SetLightFOV( 45 )
+        light:SetLightFOV( 50 )
         light:SetDistance( 768 )
         light:SetBrightness( 0.2 )
         light:Switch( false )
@@ -51,6 +51,7 @@ hook.Add( "OnEntityCreated", "gncars", function( ent )
         local vehicle = GNCars.Vehicles[class] 
         if not vehicle then return end
     
+        --  > seats
         for i, v in ipairs( vehicle.seats ) do
             local seat = GNLib.SpawnCar( "Seat_Jeep", ent:LocalToWorld( v.pos ), ent:LocalToWorldAngles( v.ang ) )
                 seat:SetParent( ent )
@@ -60,11 +61,17 @@ hook.Add( "OnEntityCreated", "gncars", function( ent )
             ent.Seats[#ent.Seats + 1] = seat
         end
 
-        local light = spawn_light( ent, Vector( 32, 100, 37 ), Angle( 0, 90, 0 ) )
-        ent.Lights[#ent.Lights + 1] = light
+        --  > lamps
+        for i, v in ipairs( vehicle.lamps ) do
+            local light = spawn_light( ent, v.pos, v.ang )
+                light.IsBackLight = v.is_back_light or false
 
-        local light2 = spawn_light( ent, Vector( -32, 100, 37 ), Angle( 0, 90, 0 ) )
-        ent.Lights[#ent.Lights + 1] = light2
+            if light.IsBackLight then
+                light:SetColor( GNLib.Colors.Alizarin )
+            end
+
+            ent.Lights[#ent.Lights + 1] = light
+        end
     end )
 end )
 
