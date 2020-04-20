@@ -43,10 +43,10 @@ local function get_car( ply )
     return car
 end
 
-local function switch_lights( car, ply, switch, back_light )
+local function switch_lights( car, switch, back_light )
     back_light = back_light or false
 
-    if IsValid( car ) and car:GetDriver() == ply then
+    if IsValid( car )  then
         for k, v in ipairs( car.Lights ) do
             if ( back_light and not v.IsBackLight ) or ( not back_light and v.IsBackLight ) then continue end
             v:Switch( switch == nil and not v:GetOn() or switch )
@@ -98,18 +98,40 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
         --  > front lights
         local car = get_car( ply )
         
-        switch_lights( car, ply, nil, false )
+        if IsValid( car ) and car:GetDriver() == ply then
+            switch_lights( car, nil, false )
+        end
     elseif bind == "+back" or bind == "+jump" then
         --  > switch on back lights
         local car = get_car( ply )
-        
-        switch_lights( car, ply, true, true )
-    else
-        --  > switch off back lights
-        local car = get_car( ply )
+        if not IsValid( car ) then return end
 
-        timer.Simple( .5, function()
-            switch_lights( car, ply, false, true )
+        --  > if car is stopped then do nothing
+        local last_speed = math.abs( car:GetHLSpeed() )
+        if last_speed <= .1 then return end
+
+        --  > switch on lights
+        if not IsValid( car ) or not ( car:GetDriver() == ply ) then return end
+        switch_lights( car, true, true )
+
+        --  > control lights
+        local id = "GNCars:BackLights" .. car:EntIndex()
+        timer.Create( id, .5, 0, function()
+            --  > if car is fucked then stop
+            if not IsValid( car ) then 
+                timer.Remove( id )
+                return 
+            end
+            
+            --  > if car speed is greater than before or car is stop then stop
+            local speed = car:GetHLSpeed()
+            if math.abs( speed ) <= .3 or speed > last_speed then 
+                switch_lights( car, false, true )
+                timer.Remove( id )
+            end
+
+            --  > stock speed into last speed
+            last_speed = speed
         end )
     end
 end )

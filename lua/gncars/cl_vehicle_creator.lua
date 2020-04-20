@@ -5,6 +5,17 @@ local function notify( ... )
     chat.AddText( GNLib.Colors.Alizarin, "GNCars: ", GNLib.Colors.Clouds, ... )
 end
 
+local function create_config_entity( model, part, pos, ang )
+    local ent = ClientsideModel( model )
+        ent:SetNoDraw( true )
+        ent:SetPos( pos or Vector() )
+        ent:SetAngles( ang or Angle() )
+        ent.PartType = part
+        ent.config = {}
+
+    return ent
+end
+
 local function get_tbl( form )
     local vehicle = {}
 
@@ -16,8 +27,13 @@ local function get_tbl( form )
         local obj = {
             pos = { v:GetPos():Unpack() },
             ang = { v:GetAngles():Unpack() },
-            is_back_light = v.IsBackLight,
+            --is_back_light = v.IsBackLight,
+            --brightness = v.Brightness,
         }
+
+        for k, v in pairs( v.config ) do
+            obj[k] = v
+        end
 
         vehicle[name][#vehicle[name] + 1] = obj
     end
@@ -115,10 +131,7 @@ local function add_ent_elements( name, model, angles, new_elements )
             text = "Add " .. name,
             color = GNLib.Colors.PeterRiver,
             action = function( form, modelpanel )
-                local ent = ClientsideModel( model )
-                    ent:SetNoDraw( true )
-                    ent:SetAngles( modelpanel.Entity:GetAngles() )
-                    ent.PartType = name
+                local ent = create_config_entity( model, name, nil, modelpanel.Entity:GetAngles() )
 
                 --  > combobox
                 local combobox = form.elements[name .. "_combo_box"]
@@ -183,6 +196,7 @@ local function add_ent_elements( name, model, angles, new_elements )
                 --  > custom
                 if name == "lamp" then
                     form.elements.toggle_back_light:SetToggled( form[name].IsBackLight )
+                    --form.elements.brightness_lamp:SetValue( form[name].Brightness or form[name].IsBackLight and .1 or .2 )
                 end
             end,
         },
@@ -220,9 +234,21 @@ add_ent_elements( "lamp", lamp_model, true, function( name ) return {
             action = function( form, toggle )
                 if not form[name] then return end
 
-                form[name].IsBackLight = toggle
+                form[name].config.IsBackLight = toggle
             end,
-        } 
+        },
+        --[[ {
+            type = "Int",
+            id = "brightness_lamp",
+            text = "Brightness",
+            bounds = { 0, .2 },
+            value = .2,
+            action = function( form, value )
+                if not form[name] then return end
+
+                form[name].Brightness = value
+            end
+        }, ]]
     }
 end )
 
@@ -374,10 +400,10 @@ function GNCars.OpenCreatorMenu()
                     local numslider = optionlist:Add( "DNumSlider" )
                         numslider:Dock( TOP )
                         numslider:DockMargin( 15, 0, 5, 0 )
-                        --numslider:SetWide( optionlist:GetWide() )
                         numslider:SetMinMax( -max_slider_value, max_slider_value )
                         numslider:SetValue( 0 )
                         numslider:SetText( axis )
+                        numslider.Label:SetFont( "GNLFont12" )
                         numslider.OnValueChanged = function( self, value )
                             vector[axis] = value
                             v.action( form, vector )
@@ -399,10 +425,10 @@ function GNCars.OpenCreatorMenu()
                     local numslider = optionlist:Add( "DNumSlider" )
                         numslider:Dock( TOP )
                         numslider:DockMargin( 15, 0, 5, 0 )
-                        --numslider:SetWide( optionlist:GetWide() )
                         numslider:SetMinMax( -360, 360 )
                         numslider:SetValue( 0 )
                         numslider:SetText( axis )
+                        numslider.Label:SetFont( "GNLFont12" )
                         numslider.OnValueChanged = function( self, value )
                             angle[axis] = value
                             v.action( form, angle )
@@ -410,6 +436,19 @@ function GNCars.OpenCreatorMenu()
 
                     element[axis] = numslider
                 end
+            elseif v.type == "Int" then
+                local numslider = optionlist:Add( "DNumSlider" )
+                    numslider:Dock( TOP )
+                    numslider:DockMargin( 15, 0, 5, 0 )
+                    numslider:SetMinMax( -v.bounds[1], v.bounds[2] )
+                    numslider:SetValue( v.value or 0 )
+                    numslider:SetText( v.text )
+                    numslider.Label:SetFont( "GNLFont12" )
+                    numslider.OnValueChanged = function( self, value )
+                        v.action( form, value )
+                    end
+
+                element = numslider
             end
 
             if element and v.id then
@@ -429,13 +468,15 @@ function GNCars.OpenCreatorMenu()
             for i, v in ipairs( conf ) do
                 local part = k:sub( 1, #k - 1 )
 
-                local ent = ClientsideModel( part == "lamp" and lamp_model or jeep_seat_model )
-                    ent:SetNoDraw( true )
-                    ent:SetPos( v.pos )
-                    ent:SetAngles( v.ang )
-                    ent.PartType = part
-                    ent.IsBackLight = v.is_back_light
-    
+                --  > create entity
+                local ent = create_config_entity( part == "lamp" and lamp_model or jeep_seat_model, part, v.pos, v.ang )
+                
+                --  > set config keys
+                for key, value in pairs( v ) do
+                    if key == "pos" or key == "ang" then continue end
+                    ent.config[key] = value
+                end
+
                 form.elements[ent.PartType .. "_combo_box"]:AddChoice( k:sub( 1, 1 ):upper() .. k:sub( 2 ) .. " #" .. i, ent )
                 vehicles_ents[i] = ent
             end

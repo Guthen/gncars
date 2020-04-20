@@ -29,11 +29,11 @@ local function spawn_light( ent, pos, ang )
         light:SetModelScale( 0 )
         light:Spawn()
 
-        light:SetFlashlightTexture( "effects/flashlight/hard" )
+        light:SetFlashlightTexture( "effects/flashlight/soft" )
         light:SetColor( color_white )
         light:SetLightFOV( 50 )
         light:SetDistance( 768 )
-        light:SetBrightness( 0.2 )
+        light:SetBrightness( 0.1 )
         light:Switch( false )
         light:UpdateLight()
 
@@ -64,11 +64,14 @@ hook.Add( "OnEntityCreated", "gncars", function( ent )
         --  > lamps
         for i, v in ipairs( vehicle.lamps ) do
             local light = spawn_light( ent, v.pos, v.ang )
-                light.IsBackLight = v.is_back_light or false
+                light.IsBackLight = v.IsBackLight or false
 
             if light.IsBackLight then
                 light:SetColor( GNLib.Colors.Alizarin )
+                light:SetDistance( 256 )
             end
+            --[[ light:SetBrightness( v.brightness or light.IsBackLight and .1 or .2 )
+            light:UpdateLight() ]]
 
             ent.Lights[#ent.Lights + 1] = light
         end

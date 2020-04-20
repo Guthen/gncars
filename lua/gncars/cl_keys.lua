@@ -8,6 +8,6 @@ hook.Add( "PlayerBindPress", "GNCars:BindTransmit", function( _, bind )
     net.SendToServer()
 end )
 
-hook.Add( "HUDPaint", "GNCars:BindDebug", function()
+--[[ hook.Add( "HUDPaint", "GNCars:BindDebug", function()
     draw.WordBox( 10, 5, 5, last_pressed, "Trebuchet24", Color( 58, 58, 58, 150 ), color_white )
-end )
+end ) ]]
