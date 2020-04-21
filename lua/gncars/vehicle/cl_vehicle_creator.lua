@@ -458,7 +458,7 @@ function GNCars.OpenCreatorMenu()
 
                 local toggle = container:Add( "GNToggleButton" )      
                     toggle:Dock( LEFT )
-                    toggle.OnToggle = function( self, toggle )
+                    toggle.OnToggled = function( self, toggle )
                         v.action( form, toggle )
                     end
                     

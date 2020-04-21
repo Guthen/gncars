@@ -110,6 +110,7 @@ hook.Add( "PlayerLeaveVehicle", "GNCars:RunVehicle", function( ply, veh )
 
     local id = "GNCars:RunVehicle" .. veh:EntIndex()
     timer.Create( id, 0, 2, function()
+        if not IsValid( veh ) then return end
         if timer.RepsLeft( id ) > 0 then return end
 
         veh:StartEngine( true )

@@ -15,7 +15,7 @@ end
 
 --  > code pasted and edited from gmod_lamp 
 local sprite_mat, beam_mat = Material( "sprites/light_ignorez" ), Material( "effects/lamp_beam" )
-local draw_beam, sprite_size_multiplicator, alpha_multiplicator = false, 2, .4
+local draw_beam, sprite_size_multiplicator, alpha_multiplicator = false, 2, .8
 function ENT:DrawTranslucent()
 	local LightNrm = self:GetAngles():Forward()
 	local ViewNormal = self:GetPos() - EyePos()
@@ -54,7 +54,7 @@ function ENT:DrawTranslucent()
 		local Size = math.Clamp( Distance * Visible * ViewDot * 2 * dist / 100 / 5, 64, 128 )
 
 		Distance = math.Clamp( Distance, 32, 800 )
-		local Alpha = math.Clamp( ( dist / 10 ) * Visible * ViewDot * self.alpha_lerp, 0, 100 * alpha_multiplicator )
+		local Alpha = math.Clamp( ( dist / 2 ) * Visible * ViewDot * self.alpha_lerp, 0, 100 * alpha_multiplicator )
 		Col.a = Alpha
 
         --local sprite_size_multiplicator = sprite_size_multiplicator * Distance / 100 * 2
