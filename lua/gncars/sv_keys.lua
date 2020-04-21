@@ -43,24 +43,53 @@ local function get_car( ply )
     return car
 end
 
-local function switch_lights( car, switch, back_light )
-    back_light = back_light or false
-
-    if IsValid( car )  then
-        for k, v in ipairs( car.Lights ) do
-            if ( back_light and not v.IsBackLight ) or ( not back_light and v.IsBackLight ) then continue end
-            v:Switch( switch == nil and not v:GetOn() or switch )
-            v:UpdateLight()
-        end
+local function switch_light( ent, switch )
+    if IsValid( ent )  then
+        ent:Switch( switch == nil and not ent:GetOn() or switch )
+        ent:UpdateLight()
     end
+end
+
+local function switch_front_lights( car, switch )
+    for i, v in ipairs( car.Lights ) do
+        if v.IsBackLight or v.BlinkerType then continue end
+        switch_light( v, switch )
+    end
+end
+
+local function switch_back_lights( car, switch )
+    local done = false
+
+    for i, v in ipairs( car.Lights ) do
+        if not v.IsBackLight or v.BlinkerType then continue end
+        switch_light( v, switch )
+
+        done = true
+    end
+
+    return done
+end
+
+local function switch_blinker_lights( car, switch, side )
+    local done = false
+
+    for i, v in ipairs( car.Lights ) do
+        if v.IsBackLight or not v.BlinkerType then continue end
+        if not ( v.BlinkerType == side ) then continue end
+        switch_light( v, switch )
+
+        done = true
+    end
+
+    return done
 end
 
 util.AddNetworkString( "GNCars:BindTransmit" )
 net.Receive( "GNCars:BindTransmit", function( _, ply )
     local bind = net.ReadString()
 
+    --  > enter a vehicle seat
     if bind == "+use" then
-        --  > enter a vehicle seat
         if ply:InVehicle() then return end
 
         local trace = ply:GetEyeTrace()
@@ -70,8 +99,8 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
         if target:GetPos():Distance( ply:GetPos() ) > 128 then return end
 
         choose_vehicle_seat( ply, target, trace )
+    --  > change siege role
     elseif bind:StartWith( "slot" ) then
-        --  > change siege role
         local id = tonumber( bind:Replace( "slot", "" ) )
         id = id == 0 and 10 or id
 
@@ -87,22 +116,22 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
             GNCars.EnterVehicle( ply, seat )
 
         end
+    --  > coink coink
     elseif bind == "+reload" then
-        --  > coink coink
         local car = get_car( ply )
 
         if IsValid( car ) and car:GetDriver() == ply then
-            car:EmitSound( "ambient/alarms/klaxon1.wav" )
+            car:EmitSound( "gncars/klaxon" .. math.random( 1, 2 ) .. ".wav" )
         end
+    --  > front lights
     elseif bind == "impulse 100" then
-        --  > front lights
         local car = get_car( ply )
         
         if IsValid( car ) and car:GetDriver() == ply then
-            switch_lights( car, nil, false )
+            switch_front_lights( car, nil )
         end
+    --  > back lights
     elseif bind == "+back" or bind == "+jump" then
-        --  > switch on back lights
         local car = get_car( ply )
         if not IsValid( car ) then return end
 
@@ -112,7 +141,7 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
 
         --  > switch on lights
         if not IsValid( car ) or not ( car:GetDriver() == ply ) then return end
-        switch_lights( car, true, true )
+        if not switch_back_lights( car, true ) then return end
 
         --  > control lights
         local id = "GNCars:BackLights" .. car:EntIndex()
@@ -126,12 +155,57 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
             --  > if car speed is greater than before or car is stop then stop
             local speed = car:GetHLSpeed()
             if math.abs( speed ) <= .3 or speed > last_speed then 
-                switch_lights( car, false, true )
+                switch_back_lights( car, false )
                 timer.Remove( id )
             end
 
             --  > stock speed into last speed
             last_speed = speed
+        end )
+    elseif bind == "+attack" or bind == "+attack2" then
+        --  > get car
+        local car = get_car( ply )
+        if not IsValid( car ) or not ( car:GetDriver() == ply ) then return end
+
+        --  > get side and switch on desired side and off the other side
+        local side = bind == "+attack2" and "right" or "left"
+        local other_side = side == "right" and "left" or "right"
+
+        if not switch_blinker_lights( car, nil, side ) then return end
+
+        --  > get identifier and fuck off the other side
+        local base_id = "GNCars:BlinkerLights"
+        local id = base_id .. side .. car:EntIndex()
+        if timer.Exists( id ) then 
+            switch_blinker_lights( car, false, side )
+            return timer.Remove( id ) 
+        else 
+            switch_blinker_lights( car, false, other_side )
+            timer.Remove( base_id .. other_side .. car:EntIndex() ) 
+        end
+        
+        --  > get to work the timer
+        local toggled, last_ang_y = true, car:GetAngles().y
+        timer.Create( id, .5, 0, function()
+            --  > if car is fucked then stop
+            if not IsValid( car ) then 
+                timer.Remove( id )
+                return 
+            end
+
+            --  > if you turn then stop
+            local ang_y = car:GetAngles().y
+            if math.abs( last_ang_y - ang_y ) > 80 then
+                switch_blinker_lights( car, false, side )
+                timer.Remove( id )
+                return
+            end
+
+            --  > blink again
+            switch_blinker_lights( car, nil, side )
+            toggled = not toggled
+
+            car:EmitSound( "gncars/blinker" .. ( toggled and "1" or "2" ) .. ".wav" )
         end )
     end
 end )

@@ -195,8 +195,11 @@ local function add_ent_elements( name, model, angles, new_elements )
 
                 --  > custom
                 if name == "lamp" then
-                    form.elements.toggle_back_light:SetToggled( form[name].IsBackLight )
+                    form.elements.toggle_secondary_light:SetToggle( form[name].config.IsSecondaryLight )
+                    form.elements.toggle_back_light:SetToggle( form[name].config.IsBackLight )
                     --form.elements.brightness_lamp:SetValue( form[name].Brightness or form[name].IsBackLight and .1 or .2 )
+                    form.elements.toggle_blinker_left:SetToggle( form[name].config.BlinkerType == "left" )
+                    form.elements.toggle_blinker_right:SetToggle( form[name].config.BlinkerType == "right" )
                 end
             end,
         },
@@ -229,12 +232,86 @@ add_ent_elements( "seat", jeep_seat_model, true )
 add_ent_elements( "lamp", lamp_model, true, function( name ) return {
         {
             type = "Toggle",
+            id = "toggle_secondary_light",
+            text = "Secondary light",
+            action = function( form, toggle )
+                if not form[name] then return end
+
+                form[name].config.IsSecondaryLight = toggle or nil
+
+                --  > turn off other settings
+                if toggle then
+                    form.elements.toggle_back_light:SetToggle( false )
+                    form.elements.toggle_blinker_left:SetToggle( false )
+                    form.elements.toggle_blinker_right:SetToggle( false )
+                end
+            end,
+        },
+        {
+            type = "Toggle",
             id = "toggle_back_light",
             text = "Back light",
             action = function( form, toggle )
                 if not form[name] then return end
 
-                form[name].config.IsBackLight = toggle
+                form[name].config.IsBackLight = toggle or nil
+
+                --  > turn off other settings
+                if toggle then
+                    form.elements.toggle_secondary_light:SetToggle( false )
+                    form.elements.toggle_blinker_left:SetToggle( false )
+                    form.elements.toggle_blinker_right:SetToggle( false )
+                end
+            end,
+        },
+        {
+            type = "Toggle",
+            id = "toggle_blinker_right",
+            text = "Blinker Right",
+            action = function( form, toggle )
+                if not form[name] then return end
+
+                --  > set type
+                form[name].config.BlinkerType = toggle and "right" or nil
+
+                --  > turn off the other if activated
+                local other_toggle = form.elements.toggle_blinker_left
+                if toggle and other_toggle then
+                    other_toggle:SetToggle( false )
+                elseif toggle then
+                    other_toggle:SetToggle( true )
+                end
+
+                --  > turn off other settings
+                if toggle then
+                    form.elements.toggle_secondary_light:SetToggle( false )
+                    form.elements.toggle_back_light:SetToggle( false )
+                end
+            end,
+        },
+        {
+            type = "Toggle",
+            id = "toggle_blinker_left",
+            text = "Blinker Left",
+            action = function( form, toggle )
+                if not form[name] then return end
+
+                --  > set type
+                form[name].config.BlinkerType = toggle and "left" or nil
+                
+                --  > turn off the other if activated
+                local other_toggle = form.elements.toggle_blinker_right
+                if toggle and other_toggle then
+                    other_toggle:SetToggle( false )
+                elseif toggle then
+                    other_toggle:SetToggle( true )
+                end
+
+                --  > turn off back light
+                if toggle then
+                    form.elements.toggle_secondary_light:SetToggle( false )
+                    form.elements.toggle_back_light:SetToggle( false )
+                end
             end,
         },
         --[[ {
@@ -381,7 +458,7 @@ function GNCars.OpenCreatorMenu()
 
                 local toggle = container:Add( "GNToggleButton" )      
                     toggle:Dock( LEFT )
-                    toggle.OnToggled = function( self, toggle )
+                    toggle.OnToggle = function( self, toggle )
                         v.action( form, toggle )
                     end
                     

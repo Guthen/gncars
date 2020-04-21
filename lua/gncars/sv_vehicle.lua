@@ -21,7 +21,7 @@ function GNCars.EnterVehicle( ply, veh )
 end
 
 local function spawn_light( ent, pos, ang )
-    local light = ents.Create( "gmod_lamp" )
+    local light = ents.Create( "gncars_lamp" )
         light:SetPos( ent:LocalToWorld( pos ) )
         light:SetAngles( ent:LocalToWorldAngles( ang ) )
         light:SetModel( "models/props_junk/PopCan01a.mdl" )
@@ -65,13 +65,20 @@ hook.Add( "OnEntityCreated", "gncars", function( ent )
         for i, v in ipairs( vehicle.lamps ) do
             local light = spawn_light( ent, v.pos, v.ang )
                 light.IsBackLight = v.IsBackLight or false
+                light.BlinkerType = v.BlinkerType
 
             if light.IsBackLight then
                 light:SetColor( GNLib.Colors.Alizarin )
                 light:SetDistance( 256 )
+            elseif light.BlinkerType then
+                light:SetColor( GNLib.Colors.Orange )
+                light:SetDistance( 128 )
+                --[[ light:Switch( true )
+                light:SetBrightness( .001 ) ]]
             end
             --[[ light:SetBrightness( v.brightness or light.IsBackLight and .1 or .2 )
             light:UpdateLight() ]]
+            light:UpdateLight()
 
             ent.Lights[#ent.Lights + 1] = light
         end
@@ -96,4 +103,16 @@ hook.Add( "EntityTakeDamage", "GNCars:PassengersDamages", function( car, dmg )
 
         ply:TakeDamage( dmg:GetDamage(), dmg:GetAttacker(), dmg:GetInflictor() )
     end
+end )
+
+hook.Add( "PlayerLeaveVehicle", "GNCars:RunVehicle", function( ply, veh )
+    if ply:KeyDown( IN_JUMP ) then return end
+
+    local id = "GNCars:RunVehicle" .. veh:EntIndex()
+    timer.Create( id, 0, 2, function()
+        if timer.RepsLeft( id ) > 0 then return end
+
+        veh:StartEngine( true )
+        veh:ReleaseHandbrake()
+    end )
 end )
