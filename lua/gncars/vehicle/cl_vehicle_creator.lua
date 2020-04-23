@@ -174,6 +174,7 @@ local function add_ent_elements( name, model, angles, new_elements )
             text = "Current " .. name,
             action = function( form, value, data )
                 form[name] = data
+                form.selected = form[name]
 
                 --  > position
                 local sliders = form.elements[name .. "_vector"]
@@ -329,6 +330,7 @@ add_ent_elements( "lamp", lamp_model, true, function( name ) return {
     }
 end )
 
+local selection_mat = Material( "sprites/grip_hover" )
 function GNCars.OpenCreatorMenu()
     local form = { elements = {}, entities = {}, wireframe = false }
 
@@ -362,15 +364,38 @@ function GNCars.OpenCreatorMenu()
         modelpanel.LayoutEntity = function( self, ent )
             if form.wireframe then 
                 ent:SetMaterial( "models/wireframe" )
+                self:SetColor( ColorAlpha( color_white, 5 ) )
             else
                 ent:SetMaterial( "" )
+                self:SetColor( color_white )
             end
         end
         modelpanel.PreDrawModel = function( self, ent )
+            --  > change alpha to 1 (else we can't see entities in wireframe mode)
+            local blend = render.GetBlend()
+            render.SetBlend( 1 )
+
             for i, v in ipairs( form.entities ) do
                 if not IsValid( v ) then v:Remove() table.remove( form.entities, i ) continue end
+                
+                --  > change his color if he is selected
+                local r, g, b
+                if form.selected == v then
+                    r, g, b = render.GetColorModulation()
+                    render.SetColorModulation( GNLib.Colors.Emerald:ToVector():Unpack() )
+                end
+
+                --  > draw
                 v:DrawModel()
+
+                --  > reset color
+                if form.selected == v then
+                    render.SetColorModulation( r, g, b )
+                end
             end
+
+            --  > reset alpha
+            render.SetBlend( blend )
         end
 
     local optionlist = frame:Add( "DScrollPanel" )

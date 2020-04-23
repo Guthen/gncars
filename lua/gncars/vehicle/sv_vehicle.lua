@@ -64,9 +64,14 @@ hook.Add( "OnEntityCreated", "gncars", function( ent )
         --  > lamps
         for i, v in ipairs( vehicle.lamps ) do
             local light = spawn_light( ent, v.pos, v.ang )
-                light.IsBackLight = v.IsBackLight or false
-                light.BlinkerType = v.BlinkerType
 
+            --  > set custom properties
+            for k, v in pairs( v ) do
+                if k == "pos" or k == "ang" then continue end
+                light[k] = v
+            end
+
+            --  > check properties
             if light.IsBackLight then
                 light:SetColor( GNLib.Colors.Alizarin )
                 light:SetDistance( 256 )

@@ -44,7 +44,7 @@ local function get_car( ply )
 end
 
 local function switch_light( ent, switch )
-    if IsValid( ent )  then
+    if IsValid( ent ) then
         ent:Switch( switch == nil and not ent:GetOn() or switch )
         ent:UpdateLight()
     end
@@ -52,7 +52,14 @@ end
 
 local function switch_front_lights( car, switch )
     for i, v in ipairs( car.Lights ) do
-        if v.IsBackLight or v.BlinkerType then continue end
+        if v.IsBackLight or v.BlinkerType or v.IsSecondaryLight then continue end
+        switch_light( v, switch )
+    end
+end
+
+local function switch_secondary_lights( car, switch )
+    for i, v in ipairs( car.Lights ) do
+        if not v.IsSecondaryLight then continue end
         switch_light( v, switch )
     end
 end
@@ -128,7 +135,22 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
         local car = get_car( ply )
         
         if IsValid( car ) and car:GetDriver() == ply then
-            switch_front_lights( car, nil )
+            local secondary = false
+            for i, v in ipairs( car.Lights ) do
+                if v.IsBackLight or v.BlinkerType then continue end
+
+                if v:GetOn() then
+                    if v.IsSecondaryLight then
+                        secondary = false
+                        break
+                    else
+                        secondary = true
+                    end
+                end
+            end
+
+            switch_front_lights( car, secondary and true or nil )
+            switch_secondary_lights( car, secondary )
         end
     --  > back lights
     elseif bind == "+back" or bind == "+jump" then
