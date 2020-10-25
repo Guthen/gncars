@@ -110,7 +110,7 @@ local elements = {
                         h = h,
                     } )
 
-                    http.Post( "http://gnlib.wizzarheberg.fr/gncars/vehicles/add.php", { json = json, img = util.Base64Encode( data ), owner = LocalPlayer():SteamID() }, function( body, len, headers, code )
+                    http.Post( "https://gnlib.mtxserv.com/gncars/vehicles/add.php", { json = json, img = util.Base64Encode( data ), owner = LocalPlayer():SteamID() }, function( body, len, headers, code )
                         notify( ( "Response (HTTP/%d): %s" ):format( code, body ) )
                     end )
 
