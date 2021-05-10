@@ -38,7 +38,7 @@ end )
 --  > fetch vehicles data
 function GNCars.FetchVehicles()
     local time = os.clock()
-    http.Post( "http://gnlib.wizzarheberg.fr/gncars/vehicles/get.php", { json = util.TableToJSON( GNCars.GetCustomVehicleClasses( true ) ) }, function( raw )
+    http.Post( "http://gnlib.mtxserv.com/gncars/vehicles/get.php", { json = util.TableToJSON( GNCars.GetCustomVehicleClasses( true ) ) }, function( raw )
         local vehicles = util.JSONToTable( raw )
         if not vehicles then return error( "GNCars: failed to fetch vehicles data" ) end
 

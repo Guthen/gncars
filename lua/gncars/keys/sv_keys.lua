@@ -98,6 +98,7 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
     --  > enter a vehicle seat
     if bind == "+use" then
         if ply:InVehicle() then return end
+        if ply.gncars_left_time and CurTime() - ply.gncars_left_time <= .25 then return end
 
         local trace = ply:GetEyeTrace()
         local target = trace.Entity
@@ -112,16 +113,13 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
         id = id == 0 and 10 or id
 
         local car = get_car( ply )
-
         if not IsValid( car ) then return end
         local seat = car.Seats[ id - 1 ]
 
         if id == 1 then
             GNCars.EnterVehicle( ply, car )
-
         elseif IsValid( seat ) then
             GNCars.EnterVehicle( ply, seat )
-
         end
     --  > coink coink
     elseif bind == "+reload" then
@@ -136,8 +134,13 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
         
         if IsValid( car ) and car:GetDriver() == ply then
             local secondary = false
+            local has_secondary = false
             for i, v in ipairs( car.Lights ) do
                 if v.IsBackLight or v.BlinkerType then continue end
+
+                if v.IsSecondaryLight then
+                    has_secondary = true
+                end
 
                 if v:GetOn() then
                     if v.IsSecondaryLight then
@@ -149,8 +152,12 @@ net.Receive( "GNCars:BindTransmit", function( _, ply )
                 end
             end
 
-            switch_front_lights( car, secondary and true or nil )
-            switch_secondary_lights( car, secondary )
+            if has_secondary then
+                switch_front_lights( car, secondary or nil )
+                switch_secondary_lights( car, secondary )
+            else
+                switch_front_lights( car, nil )
+            end
         end
     --  > back lights
     elseif bind == "+back" or bind == "+jump" then

@@ -7,7 +7,6 @@ function GNCars.EnterVehicle( ply, veh )
     if IsValid( veh:GetDriver() ) then return end
 
     local third_person_mode = false
-    
     if ply:InVehicle() then
         third_person_mode = ply:GetVehicle():GetThirdPersonMode()
         ply:ExitVehicle()
@@ -16,26 +15,26 @@ function GNCars.EnterVehicle( ply, veh )
     veh.ForceEnter = true
         veh:SetThirdPersonMode( third_person_mode )
         ply:EnterVehicle( veh )
-        ply:SetEyeAngles( veh:GetAngles() )
+        --ply:SetEyeAngles( veh:GetAngles() )
     veh.ForceEnter = nil
 end
 
 local function spawn_light( ent, pos, ang )
     local light = ents.Create( "gncars_lamp" )
-        light:SetPos( ent:LocalToWorld( pos ) )
-        light:SetAngles( ent:LocalToWorldAngles( ang ) )
-        light:SetModel( "models/props_junk/PopCan01a.mdl" )
-        light:SetParent( ent )
-        light:SetModelScale( 0 )
-        light:Spawn()
+    light:SetPos( ent:LocalToWorld( pos ) )
+    light:SetAngles( ent:LocalToWorldAngles( ang ) )
+    light:SetModel( "models/props_junk/PopCan01a.mdl" )
+    light:SetParent( ent )
+    light:SetModelScale( 0 )
+    light:Spawn()
 
-        light:SetFlashlightTexture( "effects/flashlight/soft" )
-        light:SetColor( color_white )
-        light:SetLightFOV( 50 )
-        light:SetDistance( 768 )
-        light:SetBrightness( 0.1 )
-        light:Switch( false )
-        light:UpdateLight()
+    light:SetFlashlightTexture( "effects/flashlight/soft" )
+    light:SetColor( color_white )
+    light:SetLightFOV( 50 )
+    light:SetDistance( 768 )
+    light:SetBrightness( 0.1 )
+    light:Switch( false )
+    light:UpdateLight()
 
     return light
 end
@@ -54,9 +53,9 @@ hook.Add( "OnEntityCreated", "gncars", function( ent )
         --  > seats
         for i, v in ipairs( vehicle.seats ) do
             local seat = GNLib.SpawnCar( "Seat_Jeep", ent:LocalToWorld( v.pos ), ent:LocalToWorldAngles( v.ang ) )
-                seat:SetParent( ent )
-                seat:SetNoDraw( vehicle.nodraw )
-                seat:SetNWBool( "GNCars:Seat", true )
+            seat:SetParent( ent )
+            seat:SetNoDraw( vehicle.nodraw )
+            seat:SetNWBool( "GNCars:Seat", true )
 
             ent.Seats[#ent.Seats + 1] = seat
         end
@@ -103,14 +102,14 @@ hook.Add( "EntityTakeDamage", "GNCars:PassengersDamages", function( car, dmg )
 
     for k, v in ipairs( car.Seats ) do
         local ply = v:GetDriver()
-
-        if not IsValid( ply ) then return end
+        if not IsValid( ply ) then continue end
 
         ply:TakeDamage( dmg:GetDamage(), dmg:GetAttacker(), dmg:GetInflictor() )
     end
 end )
 
 hook.Add( "PlayerLeaveVehicle", "GNCars:RunVehicle", function( ply, veh )
+    ply.gncars_left_time = CurTime()
     if ply:KeyDown( IN_JUMP ) then return end
 
     local id = "GNCars:RunVehicle" .. veh:EntIndex()
